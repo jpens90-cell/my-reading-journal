@@ -3,7 +3,7 @@ const KEY='modernBookJournalV1', SETTINGS='modernBookJournalV2Settings';
 const $=id=>document.getElementById(id), statuses={want:'Want to read',reading:'Currently reading',read:'Finished reading'};
 const getJSON=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
 const valid=b=>b&&typeof b.id==='string'&&typeof b.title==='string'&&typeof b.author==='string'&&Object.hasOwn(statuses,b.status);
-const norm=b=>({...b,cover:typeof b.cover==='string'?b.cover:'',rating:Math.min(5,Math.max(0,Number(b.rating)||0)),notes:typeof b.notes==='string'?b.notes:'',genre:typeof b.genre==='string'?b.genre:'',pages:Math.max(0,Number(b.pages)||0),currentPage:Math.max(0,Number(b.currentPage)||0),startedAt:b.startedAt||'',finishedAt:b.finishedAt||'',addedAt:b.addedAt||new Date().toISOString(),series:typeof b.series==='string'?b.series:'',seriesNumber:Math.max(0,Math.floor(Number(b.seriesNumber)||0)),characters:typeof b.characters==='string'?b.characters:'',recommendation:['yes','maybe','no'].includes(b.recommendation)?b.recommendation:''});
+const norm=b=>({...b,cover:typeof b.cover==='string'?b.cover:'',rating:Math.min(5,Math.max(0,Number(b.rating)||0)),notes:typeof b.notes==='string'?b.notes:'',genre:typeof b.genre==='string'?b.genre:'',pages:Math.max(0,Number(b.pages)||0),currentPage:Math.max(0,Number(b.currentPage)||0),startedAt:b.startedAt||'',finishedAt:b.finishedAt||'',addedAt:b.addedAt||new Date().toISOString(),series:typeof b.series==='string'?b.series:'',seriesNumber:Math.max(0,Math.floor(Number(b.seriesNumber)||0)),characters:typeof b.characters==='string'?b.characters:'',recommendation:['yes','maybe','no'].includes(b.recommendation)?b.recommendation:'',reflections:Array.isArray(b.reflections)?b.reflections.filter(r=>r&&typeof r.text==='string').slice(0,500).map(r=>({id:String(r.id||''),chapter:String(r.chapter||'').slice(0,100),title:String(r.title||'').slice(0,160),text:r.text.slice(0,12000),spoiler:!!r.spoiler,createdAt:String(r.createdAt||''),updatedAt:String(r.updatedAt||'')})):[]});
 let books=(getJSON(KEY,[])||[]).filter(valid).map(norm), settings={goal:20,view:'shelf',sort:'added',theme:'sage',autoTheme:false,...getJSON(SETTINGS,{})}, statusTab='reading',activeBook=null,previousPage='library';
 const today=()=>new Date().toLocaleDateString('en-CA',{year:'numeric',month:'2-digit',day:'2-digit'});
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n};
@@ -18,7 +18,7 @@ function renderHome(){const read=books.filter(b=>b.status==='read'),rated=books.
 $('pickBook').onclick=()=>{const pool=books.filter(b=>b.status==='want'),out=$('picked');out.replaceChildren();if(!pool.length){out.append(el('p','note','Add a few books to your Want to read list first.'));return}const b=pool[Math.floor(Math.random()*pool.length)];out.append(tile(b))};
 function renderLibrary(){const grid=$('libraryGrid'),q=$('librarySearch').value.trim().toLowerCase(),g=$('genreFilter').value;const genres=[...new Set(books.map(b=>b.genre).filter(Boolean))].sort(),prev=g;$('genreFilter').replaceChildren(new Option('All genres',''),...genres.map(x=>new Option(x,x)));$('genreFilter').value=genres.includes(prev)?prev:'';let items=books.filter(b=>b.status===statusTab&&(!q||(b.title+' '+b.author).toLowerCase().includes(q))&&(!$('genreFilter').value||b.genre===$('genreFilter').value));const sort=$('sortSelect').value;items.sort((a,b)=>sort==='title'?a.title.localeCompare(b.title):sort==='author'?a.author.localeCompare(b.author):sort==='rating'?b.rating-a.rating:sort==='date'?(b.finishedAt||'').localeCompare(a.finishedAt||''):sort==='progress'?(b.pages?b.currentPage/b.pages:0)-(a.pages?a.currentPage/a.pages:0):(b.addedAt||'').localeCompare(a.addedAt||''));grid.className='bookgrid '+(settings.view==='shelf'?'shelf':settings.view==='list'?'list':'');grid.replaceChildren();items.forEach(b=>grid.append(tile(b)));if(!items.length)grid.append(el('p','empty','No books here yet.'));$('libraryCount').textContent=items.length+' books';document.querySelectorAll('[data-status]').forEach(b=>b.classList.toggle('active',b.dataset.status===statusTab))}
 document.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{statusTab=b.dataset.status;renderLibrary()});['librarySearch','genreFilter','sortSelect'].forEach(id=>$(id).addEventListener(id==='librarySearch'?'input':'change',renderLibrary));$('viewSelect').value=settings.view;$('sortSelect').value=settings.sort;$('viewSelect').onchange=e=>{settings.view=e.target.value;saveSettings();renderLibrary()};$('sortSelect').onchange=e=>{settings.sort=e.target.value;saveSettings();renderLibrary()};
-function openDetail(id){const b=books.find(x=>x.id===id);if(!b)return;activeBook=id;previousPage=document.querySelector('.page.active')?.id||'library';const head=$('detailHeader'),text=el('div');head.replaceChildren();head.append(cover(b));text.append(el('h2','',b.title),el('p','muted',b.author+(b.year?' · '+b.year:'')));head.append(text);$('detailStatus').value=b.status;$('detailRating').value=String(b.rating);$('detailGenre').value=b.genre;$('detailPage').value=b.currentPage||'';$('detailPages').value=b.pages||'';$('detailStart').value=b.startedAt;$('detailFinish').value=b.finishedAt;$('detailNotes').value=b.notes;$('detailSeries').value=b.series||'';$('detailSeriesNumber').value=b.seriesNumber||'';$('detailCharacters').value=b.characters||'';$('detailRecommend').value=b.recommendation||'';$('oceanLink').href='https://www.google.com/search?'+new URLSearchParams({q:'site:oceanofpdf.com '+b.title+' '+b.author});detailProgress();navigate('detail')}
+function openDetail(id){const b=books.find(x=>x.id===id);if(!b)return;activeBook=id;previousPage=document.querySelector('.page.active')?.id||'library';const head=$('detailHeader'),text=el('div');head.replaceChildren();head.append(cover(b));text.append(el('h2','',b.title),el('p','muted',b.author+(b.year?' · '+b.year:'')));head.append(text);$('detailStatus').value=b.status;$('detailRating').value=String(b.rating);$('detailGenre').value=b.genre;$('detailPage').value=b.currentPage||'';$('detailPages').value=b.pages||'';$('detailStart').value=b.startedAt;$('detailFinish').value=b.finishedAt;$('detailNotes').value=b.notes;$('detailSeries').value=b.series||'';$('detailSeriesNumber').value=b.seriesNumber||'';$('detailCharacters').value=b.characters||'';$('detailRecommend').value=b.recommendation||'';detailProgress();renderReflections();resetReflectionForm();navigate('detail')}
 function current(){return books.find(b=>b.id===activeBook)}
 function detailProgress(){const b=current();if(!b)return;const pct=b.pages?Math.round(Math.min(100,b.currentPage/b.pages*100)):0;$('detailBar').style.width=pct+'%';$('detailProgress').textContent=b.pages?`${b.currentPage} of ${b.pages} pages · ${pct}% complete`:'Enter the total pages to track progress'}
 $('backDetail').onclick=()=>navigate(previousPage==='detail'?'library':previousPage);
@@ -57,3 +57,66 @@ function renderSeriesStats(){const host=$('seriesStats');host.replaceChildren();
 function renderReviewStats(){const host=$('reviewStats');host.replaceChildren();const reviews=books.filter(b=>b.notes?.trim()||b.characters?.trim()||b.recommendation).sort((a,b)=>(b.finishedAt||b.addedAt||'').localeCompare(a.finishedAt||a.addedAt||''));if(!reviews.length){host.append(el('p','note','Your reviews and reflections will appear here.'));return}for(const b of reviews.slice(0,12)){const card=el('div','review-card');card.append(el('h3','',b.title),el('p','note',b.author+(b.rating?' · '+'★'.repeat(b.rating):'')));if(b.notes)card.append(el('p','',b.notes));if(b.characters)card.append(el('p','note','Favourite characters: '+b.characters));if(b.recommendation)card.append(el('p','note','Recommend: '+b.recommendation));const btn=el('button','btn alt','Edit review');btn.onclick=()=>openDetail(b.id);card.append(btn);host.append(card)}}
 // Open Library related-title discovery: optional online suggestions, no account.
 $('recommendBtn').onclick=async()=>{const host=$('recommendResults'),msg=$('recommendMessage');host.replaceChildren();const candidates=books.filter(b=>b.rating>=4).sort((a,b)=>b.rating-a.rating);const source=candidates[0]||books.find(b=>b.genre||b.author);if(!source){msg.textContent='Add and rate a few books first to get tailored suggestions.';return}msg.textContent='Looking for books related to '+source.title+'…';$('recommendBtn').disabled=true;try{const query=source.genre?`subject:${source.genre}`:`author:${source.author}`;const url='https://openlibrary.org/search.json?'+new URLSearchParams({q:query,limit:'30',fields:'key,title,author_name,cover_i,first_publish_year,number_of_pages_median'});const response=await fetch(url);if(!response.ok)throw Error('Unavailable');const data=await response.json();const results=(data.docs||[]).filter(d=>d.key&&d.title&&!books.some(b=>b.id===d.key)).slice(0,6);if(!results.length){msg.textContent='No new suggestions found. Try again after adding more books.';return}msg.textContent='Suggestions based on '+(source.genre||source.author)+' · These are catalogue matches, not personalised AI picks.';for(const doc of results){const b={id:doc.key,title:doc.title,author:doc.author_name?.[0]||'Unknown author',year:doc.first_publish_year||'',cover:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`:'',pages:doc.number_of_pages_median||0};const row=el('div','recommend-row');row.append(cover(b));const body=el('div');body.append(el('strong','',b.title),el('p','note',b.author));const add=el('button','btn alt','+ Want to read');add.onclick=()=>{if(books.some(x=>x.id===b.id)){toast('Already in library');return}books.unshift(norm({...b,status:'want'}));if(save()){add.disabled=true;add.textContent='Added';toast('Added to Want to read')}};body.append(add);row.append(body);host.append(row)}}catch{msg.textContent='Could not load recommendations. Check your internet connection.'}finally{$('recommendBtn').disabled=false}};
+
+
+// Private, optional chapter-by-chapter reflections. Stored with each book in localStorage and JSON backups.
+function resetReflectionForm(){
+ $('reflectionForm').reset();$('reflectionEdit').value='';$('reflectionSave').textContent='Save reflection';$('reflectionCancel').classList.add('hidden');
+}
+function renderReflections(){
+ const host=$('reflectionList'),b=current();host.replaceChildren();if(!b)return;
+ if(!b.reflections.length){host.append(el('p','note','No reflections yet. Add one whenever a chapter or moment stands out.'));return}
+ [...b.reflections].sort((x,y)=>(y.createdAt||'').localeCompare(x.createdAt||'')).forEach(r=>{
+  const card=el('article','reflection-card');
+  const meta=[r.chapter,r.createdAt?new Date(r.createdAt).toLocaleDateString('en-AU'):null,r.spoiler?'Spoilers':null].filter(Boolean).join(' · ');
+  card.append(el('div','reflection-meta',meta));if(r.title)card.append(el('h3','',r.title));card.append(el('p','',r.text));
+  const actions=el('div','toolbar'),edit=el('button','btn alt','Edit'),remove=el('button','btn alt','Delete');
+  edit.type=remove.type='button';edit.onclick=()=>{$('reflectionEdit').value=r.id;$('reflectionChapter').value=r.chapter;$('reflectionTitle').value=r.title;$('reflectionText').value=r.text;$('reflectionSpoiler').checked=r.spoiler;$('reflectionSave').textContent='Update reflection';$('reflectionCancel').classList.remove('hidden');$('reflectionForm').scrollIntoView({behavior:'smooth',block:'center'})};
+  remove.onclick=()=>{if(!confirm('Delete this reflection?'))return;b.reflections=b.reflections.filter(x=>x.id!==r.id);if(save()){resetReflectionForm();renderReflections();toast('Reflection deleted')}};
+  actions.append(edit,remove);card.append(actions);host.append(card);
+ });
+}
+$('reflectionForm').onsubmit=e=>{
+ e.preventDefault();const b=current();if(!b)return;const value=$('reflectionText').value.trim();if(!value){toast('Write a reflection first');return}
+ const id=$('reflectionEdit').value,old=b.reflections.find(r=>r.id===id),now=new Date().toISOString();
+ const entry={id:old?.id||('reflection-'+Date.now()+'-'+Math.random().toString(36).slice(2)),chapter:$('reflectionChapter').value.trim(),title:$('reflectionTitle').value.trim(),text:value,spoiler:$('reflectionSpoiler').checked,createdAt:old?.createdAt||now,updatedAt:now};
+ if(old)Object.assign(old,entry);else b.reflections.push(entry);
+ if(save()){resetReflectionForm();renderReflections();toast(old?'Reflection updated':'Reflection saved')}
+};
+$('reflectionCancel').onclick=resetReflectionForm;
+
+// V5: Device-only, individually selected printable bookshelf. No account or uploads.
+const selectedForShare=new Set();
+function renderShareChoices(){
+ const host=$('shareChoices');host.replaceChildren();
+ const ordered=[...books].sort((a,b)=>(a.status==='reading'?0:1)-(b.status==='reading'?0:1)||a.title.localeCompare(b.title));
+ if(!ordered.length)host.append(el('p','note','Add books to your library first.'));
+ ordered.forEach(b=>{
+  const label=el('label','share-choice'),cb=document.createElement('input');cb.type='checkbox';cb.checked=selectedForShare.has(b.id);
+  cb.onchange=()=>{if(cb.checked)selectedForShare.add(b.id);else selectedForShare.delete(b.id);updateShareCount()};
+  label.append(cb);
+  if(b.cover){const img=el('img');img.src=b.cover;img.alt='';img.onerror=()=>img.remove();label.append(img)}
+  const text=el('span');text.append(document.createTextNode(b.title));text.append(el('small','',b.author+' · '+statuses[b.status]));label.append(text);host.append(label);
+ });updateShareCount();
+}
+function updateShareCount(){const n=books.filter(b=>selectedForShare.has(b.id)).length;$('shareCount').textContent=n+' book'+(n===1?'':'s')+' selected';$('sharePrint').disabled=!n}
+$('openShare').onclick=()=>{const panel=$('sharePanel'),opening=panel.classList.contains('hidden');panel.classList.toggle('hidden');if(opening){if(!selectedForShare.size)books.filter(b=>b.status==='reading').forEach(b=>selectedForShare.add(b.id));renderShareChoices()}};
+$('shareReadingOnly').onclick=()=>{selectedForShare.clear();books.filter(b=>b.status==='reading').forEach(b=>selectedForShare.add(b.id));renderShareChoices()};
+$('shareClear').onclick=()=>{selectedForShare.clear();renderShareChoices()};
+$('sharePrint').onclick=()=>{
+ const chosen=books.filter(b=>selectedForShare.has(b.id));if(!chosen.length){toast('Select at least one book');return}
+ const sheet=$('printSheet');sheet.replaceChildren();
+ const header=el('div','print-head');header.append(el('div','','BETWEEN THE PAGES'),el('h1','','My Reading Shelf'),el('p','',new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'})));sheet.append(header);
+ chosen.forEach(b=>{
+  const row=el('article','print-item');if(b.cover){const img=el('img');img.src=b.cover;img.alt='';row.append(img)}
+  const content=el('div');content.append(el('h2','',b.title),el('p','',b.author),el('p','',statuses[b.status]));
+  if($('shareProgress').checked&&b.status==='reading'&&b.pages>0){const pct=Math.max(0,Math.min(100,Math.round(b.currentPage/b.pages*100)));content.append(el('p','',pct+'% complete · '+b.currentPage+' of '+b.pages+' pages'));const bar=el('div','print-progress');const fill=el('div');fill.style.width=pct+'%';bar.append(fill);content.append(bar)}
+  if($('shareReflections').checked&&b.reflections?.length){
+   const section=el('div','print-reflections');section.append(el('h3','','Reading reflections'));
+   b.reflections.forEach(r=>{const item=el('div','print-reflection');item.append(el('p','', [r.chapter,r.title,r.spoiler?'Contains spoilers':null].filter(Boolean).join(' · ')));item.append(el('p','',r.text));section.append(item)});
+   content.append(section);
+  }
+  row.append(content);sheet.append(row);
+ });sheet.append(el('p','print-foot','Shared from Between the Pages · A snapshot of my reading journey'));
+ window.print();
+};
